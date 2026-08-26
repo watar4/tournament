@@ -8,13 +8,15 @@
   </head>
   <body>
     <main class="app-shell">
-      <header class="app-header">
-        <div>
+      <header class="hero">
+        <div class="hero-copy">
           <p class="eyebrow">BBQ AFTER PARTY</p>
-          <h1>アソビ大全トーナメント</h1>
+          <h1>アソビ大全<br />トーナメント</h1>
+          <p class="lead">勝つほど軽くなる食材費。負けても順位決定戦で最後まで熱い夜。</p>
         </div>
-        <div class="pot-panel">
-          <label for="foodBudget">食材費合計</label>
+
+        <section class="control-panel" aria-label="支払い設定">
+          <label class="total-label" for="foodBudget">食材費合計</label>
           <div class="money-input">
             <span>¥</span>
             <input id="foodBudget" type="number" min="0" step="1000" value="60000" />
@@ -28,7 +30,7 @@
             <label><input type="radio" name="rankMode" value="ties" checked /> 同率あり</label>
             <label><input type="radio" name="rankMode" value="strict" /> 同率なし</label>
           </div>
-        </div>
+        </section>
       </header>
 
       <section class="setup-band" aria-labelledby="setupTitle">
@@ -39,9 +41,9 @@
         <div class="entry-grid">
           <textarea id="memberInput" rows="8" spellcheck="false" placeholder="1行に1人ずつ入力&#10;例:&#10;たろう&#10;じろう&#10;さぶろう&#10;しろう"></textarea>
           <div class="entry-actions">
-            <button id="sampleButton" class="secondary-button" type="button">サンプル投入</button>
+            <button id="sampleButton" class="ghost-button" type="button">サンプル投入</button>
             <button id="createButton" class="primary-button" type="button">トーナメント作成</button>
-            <p id="entryHint" class="hint">2人以上で作成できます。人数が奇数の場合はランダムでシードを割り当てます。</p>
+            <p class="hint">奇数人数の場合はランダムでシードを割り当てます。</p>
           </div>
         </div>
       </section>
@@ -71,11 +73,19 @@
             </div>
             <div class="roulette-controls">
               <button id="startRouletteButton" class="primary-button" type="button">スタート</button>
-              <button id="stopRouletteButton" class="danger-button" type="button" disabled>ストップ</button>
+              <button id="stopRouletteButton" class="stop-button" type="button" disabled>ストップ</button>
             </div>
           </div>
           <div id="gameList" class="game-list" aria-label="収録ゲーム一覧"></div>
         </aside>
+      </section>
+
+      <section id="results" class="results-section" aria-labelledby="resultsTitle">
+        <div class="section-heading">
+          <p class="eyebrow">RESULT</p>
+          <h2 id="resultsTitle">結果と支払い</h2>
+        </div>
+        <div id="resultsPanel" class="results-panel empty-state">決勝まで進むと結果を表示します。</div>
       </section>
     </main>
 
@@ -89,5 +99,3 @@
     <script src="script.js"></script>
   </body>
 </html>
-
-

@@ -23,4 +23,3 @@ GitHub Pages では `main` ブランチのルートを公開対象にしてく�
 サムネイル画像は任天堂公式ページで利用されている画像 URL を参照しています。
 
 参照: https://www.nintendo.com/jp/switch/as7ta/games/index.html
-
