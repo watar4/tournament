@@ -12,24 +12,25 @@
         <div class="hero-copy">
           <p class="eyebrow">BBQ AFTER PARTY</p>
           <h1>アソビ大全<br />トーナメント</h1>
-          <p class="lead">勝つほど軽くなる食材費。負けても順位決定戦で最後まで熱い夜。</p>
+          <p class="lead">勝つほど軽くなる食材費。最後まで笑える、ちゃんと残酷な順位戦。</p>
         </div>
 
         <section class="control-panel" aria-label="支払い設定">
-          <label class="total-label" for="foodBudget">食材費合計</label>
-          <div class="money-input">
+          <label class="field-label" for="foodBudget">食材費合計</label>
+          <div class="money-input total-input">
             <span>¥</span>
-            <input id="foodBudget" type="number" min="0" step="1000" value="60000" />
+            <input id="foodBudget" type="number" inputmode="numeric" min="0" step="1000" value="60000" />
           </div>
           <div class="budget-grid">
-            <label>平均<input id="averageShare" type="text" readonly value="¥0" /></label>
-            <label>MAX<input id="maxShare" type="number" min="0" step="500" value="12000" /></label>
-            <label>MIN<input id="minShare" type="number" min="0" step="500" value="3000" /></label>
+            <label class="mini-field">平均<input id="averageShare" type="text" readonly value="¥0" /></label>
+            <label class="mini-field">敗者の支払い金額<input id="maxShare" type="number" inputmode="numeric" min="0" step="500" value="12000" /></label>
+            <label class="mini-field">勝者の支払い金額<input id="minShare" type="number" inputmode="numeric" min="0" step="500" value="3000" /></label>
           </div>
           <div class="rank-mode" role="radiogroup" aria-label="順位モード">
             <label><input type="radio" name="rankMode" value="ties" checked /> 同率あり</label>
             <label><input type="radio" name="rankMode" value="strict" /> 同率なし</label>
           </div>
+          <p id="paymentStatus" class="payment-status" aria-live="polite"></p>
         </section>
       </header>
 

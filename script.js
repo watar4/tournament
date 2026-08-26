@@ -34,6 +34,7 @@ const state = {
   rouletteTimer: null,
   rouletteDelay: 64,
   rouletteStopping: false,
+  paymentIssue: "",
   selectedGame: null
 };
 
@@ -42,6 +43,7 @@ const foodBudget = document.querySelector("#foodBudget");
 const averageShare = document.querySelector("#averageShare");
 const maxShare = document.querySelector("#maxShare");
 const minShare = document.querySelector("#minShare");
+const paymentStatus = document.querySelector("#paymentStatus");
 const bracket = document.querySelector("#bracket");
 const resultsPanel = document.querySelector("#resultsPanel");
 const matchTemplate = document.querySelector("#matchTemplate");
@@ -75,7 +77,6 @@ stopRouletteButton.addEventListener("click", stopRoulette);
 function createTournament() {
   const members = memberInput.value.split(/\n|,/).map((name) => name.trim()).filter(Boolean);
   const uniqueMembers = [...new Set(members)];
-
   if (uniqueMembers.length < 2) {
     bracket.textContent = "2人以上の名前を入力してください。";
     bracket.className = "bracket empty-state";
@@ -83,7 +84,6 @@ function createTournament() {
     renderResults();
     return;
   }
-
   state.members = shuffle(uniqueMembers);
   buildInitialRounds(state.members);
 }
@@ -136,16 +136,12 @@ function selectMainWinner(roundIndex, matchIndex, winner) {
   state.placementNodes = [];
   propagateMainWinners();
   renderAll();
-
-  if (isFinalMatch(roundIndex, matchIndex)) {
-    document.querySelector("#results").scrollIntoView({ behavior: "smooth", block: "start" });
-  }
+  if (isFinalMatch(roundIndex, matchIndex)) document.querySelector("#results").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function clearFollowingMain(roundIndex, matchIndex) {
   let nextRoundIndex = roundIndex + 1;
   let nextMatchIndex = Math.floor(matchIndex / 2);
-
   while (state.mainRounds[nextRoundIndex]) {
     const match = state.mainRounds[nextRoundIndex][nextMatchIndex];
     match.winner = null;
@@ -173,16 +169,11 @@ function propagateMainWinners() {
 
 function ensurePlacementNodes() {
   if (getRankMode() !== "strict" || !getChampion() || state.placementNodes.length) return;
-  const finalRoundIndex = state.mainRounds.length - 1;
   let startRank = 2;
-
-  for (let roundIndex = finalRoundIndex; roundIndex >= 0; roundIndex -= 1) {
-    const losers = state.mainRounds[roundIndex]
-      .map((match) => match.loser)
-      .filter((player) => player && player !== "BYE");
-    if (losers.length === 1) {
-      startRank += 1;
-    } else if (losers.length > 1) {
+  for (let roundIndex = state.mainRounds.length - 1; roundIndex >= 0; roundIndex -= 1) {
+    const losers = state.mainRounds[roundIndex].map((match) => match.loser).filter(Boolean);
+    if (losers.length === 1) startRank += 1;
+    if (losers.length > 1) {
       state.placementNodes.push(createPlacementNode(shuffle(losers), startRank));
       startRank += losers.length;
     }
@@ -193,10 +184,10 @@ function createPlacementNode(players, startRank) {
   const id = `p-${startRank}-${Math.random().toString(36).slice(2, 9)}`;
   if (players.length <= 1) return { id, players, startRank, matches: [], children: [] };
   const size = nextPowerOfTwo(players.length);
-  const shuffled = [...players, ...Array(size - players.length).fill("BYE")];
+  const seeded = [...players, ...Array(size - players.length).fill("BYE")];
   const matches = [];
-  for (let i = 0; i < shuffled.length; i += 2) {
-    const pair = [shuffled[i], shuffled[i + 1]];
+  for (let i = 0; i < seeded.length; i += 2) {
+    const pair = [seeded[i], seeded[i + 1]];
     matches.push({
       id: `${id}-${i / 2}`,
       players: pair,
@@ -205,7 +196,7 @@ function createPlacementNode(players, startRank) {
       completedAt: null
     });
   }
-  return { id, players: shuffled, realCount: players.length, startRank, matches, children: [] };
+  return { id, players: seeded, startRank, matches, children: [] };
 }
 
 function selectPlacementWinner(nodeId, matchIndex, winner) {
@@ -214,22 +205,21 @@ function selectPlacementWinner(nodeId, matchIndex, winner) {
   const match = node.matches[matchIndex];
   match.winner = winner;
   match.loser = match.players.find((player) => player && player !== "BYE" && player !== winner) || null;
-  match.completedAt = ++state.resultSequence;
+  match.completedAt = match.loser ? ++state.resultSequence : null;
   node.children = [];
-
-  if (node.players.filter((player) => player !== "BYE").length > 2 && node.matches.every((item) => item.winner && (item.loser || item.players.includes("BYE")))) {
-    const winners = node.matches.map((item) => item.winner).filter(Boolean);
-    const losers = node.matches.map((item) => item.loser).filter(Boolean);
-    node.children = [
-      createPlacementNode(winners, node.startRank),
-      createPlacementNode(losers, node.startRank + winners.length)
-    ].filter((child) => child.players.length);
-  }
-
+  splitPlacementNode(node);
   renderAll();
-  if (allStrictRanksDecided()) {
-    document.querySelector("#results").scrollIntoView({ behavior: "smooth", block: "start" });
-  }
+  if (allStrictRanksDecided()) document.querySelector("#results").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function splitPlacementNode(node) {
+  const realPlayers = node.players.filter((player) => player !== "BYE");
+  if (realPlayers.length <= 2) return;
+  if (!node.matches.every((match) => match.winner && (match.loser || match.players.includes("BYE")))) return;
+  const winners = node.matches.map((match) => match.winner).filter(Boolean);
+  const losers = node.matches.map((match) => match.loser).filter(Boolean);
+  node.children = [createPlacementNode(winners, node.startRank), createPlacementNode(losers, node.startRank + winners.length)]
+    .filter((child) => child.players.length);
 }
 
 function findPlacementNode(id, nodes) {
@@ -246,12 +236,12 @@ function renderAll() {
   ensurePlacementNodes();
   renderBracket();
   renderResults();
+  renderPaymentNotice();
 }
 
 function renderBracket() {
   bracket.className = "bracket";
   bracket.innerHTML = "";
-
   if (!state.mainRounds.length) {
     bracket.className = "bracket empty-state";
     bracket.textContent = "メンバーを入力してトーナメントを作成してください。";
@@ -275,10 +265,9 @@ function renderBracket() {
 }
 
 function renderPlacementNode(node, shares) {
+  splitPlacementNode(node);
   const realPlayers = node.players.filter((player) => player !== "BYE");
-  const title = realPlayers.length === 2
-    ? `${node.startRank}位 / ${node.startRank + 1}位 決定戦`
-    : `${node.startRank}-${node.startRank + realPlayers.length - 1}位 決定ブロック`;
+  const title = realPlayers.length === 2 ? `${node.startRank}位 / ${node.startRank + 1}位 決定戦` : `${node.startRank}-${node.startRank + realPlayers.length - 1}位 決定ブロック`;
 
   if (realPlayers.length === 1) {
     const round = document.createElement("div");
@@ -286,8 +275,7 @@ function renderPlacementNode(node, shares) {
     round.innerHTML = `<div class="round-title">${title}</div>`;
     const card = matchTemplate.content.firstElementChild.cloneNode(true);
     card.querySelector(".match-title").textContent = `${node.startRank}位 確定`;
-    const playersEl = card.querySelector(".players");
-    playersEl.append(renderPlayerButton(realPlayers[0], shares, true));
+    card.querySelector(".players").append(renderPlayerButton(realPlayers[0], shares, true));
     round.append(card);
     bracket.append(round);
     return;
@@ -306,7 +294,6 @@ function renderRound(titleText, matches, onPick, shares) {
   title.className = "round-title";
   title.textContent = titleText;
   roundEl.append(title);
-
   matches.forEach((match, matchIndex) => {
     const card = matchTemplate.content.firstElementChild.cloneNode(true);
     card.querySelector(".match-title").textContent = `MATCH ${matchIndex + 1}`;
@@ -314,7 +301,6 @@ function renderRound(titleText, matches, onPick, shares) {
     match.players.forEach((player) => playersEl.append(renderPlayerButton(player, shares, false, match, matchIndex, onPick)));
     roundEl.append(card);
   });
-
   return roundEl;
 }
 
@@ -322,7 +308,6 @@ function renderPlayerButton(player, shares, locked = false, match = null, matchI
   const button = document.createElement("button");
   button.type = "button";
   button.className = "player-button";
-
   if (!player) {
     button.textContent = "勝者待ち";
     button.disabled = true;
@@ -334,9 +319,8 @@ function renderPlayerButton(player, shares, locked = false, match = null, matchI
     button.classList.add("bye");
     return button;
   }
-
   const share = shares.get(player) || { amount: 0, rankLabel: "-" };
-  button.innerHTML = `<span class="player-name">${escapeHtml(player)}</span><span class="share">${share.rankLabel} / ¥${share.amount.toLocaleString()}</span>`;
+  button.innerHTML = `<span class="player-name">${escapeHtml(player)}</span><span class="share">${share.rankLabel} / ${formatYen(share.amount)}</span>`;
   if (locked) button.disabled = true;
   if (match?.winner === player) button.classList.add("winner");
   if (onPick && !locked) button.addEventListener("click", () => onPick(match, matchIndex, player));
@@ -350,7 +334,6 @@ function renderResults() {
     resultsPanel.textContent = "決勝まで進むと結果を表示します。";
     return;
   }
-
   const strict = getRankMode() === "strict";
   const complete = !strict || allStrictRanksDecided();
   const shares = calculateShares();
@@ -360,32 +343,98 @@ function renderResults() {
     <div class="winner-strip">
       <span>WINNER</span>
       <strong>${escapeHtml(champion)}</strong>
-      <em>¥${(shares.get(champion)?.amount || 0).toLocaleString()}</em>
+      <em>${formatYen(shares.get(champion)?.amount || 0)}</em>
     </div>
     ${strict && !complete ? '<p class="result-note">順位決定戦をすべて終えると、同率なしの支払いが確定します。</p>' : ''}
     <div class="result-table">
       ${standings.map((item) => {
         const share = shares.get(item.member) || { amount: 0, rankLabel: `${item.rank}位` };
-        return `<div class="result-row"><span>${share.rankLabel}</span><strong>${escapeHtml(item.member)}</strong><em>¥${share.amount.toLocaleString()}</em></div>`;
+        return `<div class="result-row"><span>${share.rankLabel}</span><strong>${escapeHtml(item.member)}</strong><em>${formatYen(share.amount)}</em></div>`;
       }).join("")}
     </div>`;
 }
 
 function calculateShares() {
   const totalBudget = Math.max(0, Number(foodBudget.value || 0));
-  const minValue = Math.max(0, Number(minShare.value || 0));
-  const maxValue = Math.max(minValue, Number(maxShare.value || minValue));
+  const winnerPay = Math.max(0, Number(minShare.value || 0));
+  const loserPay = Math.max(winnerPay, Number(maxShare.value || winnerPay));
   const standings = buildStandings(getRankMode());
-  const maxRank = Math.max(...standings.map((item) => item.rank), 1);
-  const raw = standings.map((item) => {
-    const ratio = maxRank === 1 ? 0 : (item.rank - 1) / (maxRank - 1);
-    return { ...item, amount: Math.round(minValue + (maxValue - minValue) * ratio) };
-  });
+  const allocated = allocatePayments(standings, totalBudget, winnerPay, loserPay);
+  state.paymentIssue = allocated.note;
+  return new Map(allocated.items.map((item) => [item.member, { amount: item.amount, rankLabel: `${item.rank}位` }]));
+}
 
-  return new Map(normalizeTotal(raw, totalBudget, minValue, maxValue).map((item) => [item.member, {
-    amount: item.amount,
-    rankLabel: `${item.rank}位`
-  }]));
+function allocatePayments(standings, totalBudget, winnerPay, loserPay) {
+  if (!standings.length) return { items: [], note: "" };
+  if (standings.length === 1) return { items: [{ ...standings[0], amount: totalBudget }], note: "" };
+
+  const maxRank = Math.max(...standings.map((item) => item.rank), 1);
+  const items = standings.map((item) => {
+    const ratio = maxRank === 1 ? 0 : (item.rank - 1) / (maxRank - 1);
+    return { ...item, amount: Math.round(winnerPay + (loserPay - winnerPay) * ratio) };
+  });
+  const minPossible = winnerPay * standings.length;
+  const maxPossible = loserPay * standings.length;
+  const firstCount = standings.filter((item) => item.rank === 1).length;
+  const lastCount = standings.filter((item) => item.rank === maxRank).length;
+  const endpointLow = winnerPay * (standings.length - lastCount) + loserPay * lastCount;
+  const endpointHigh = winnerPay * firstCount + loserPay * (standings.length - firstCount);
+  let note = "";
+
+  if (totalBudget < minPossible || totalBudget > maxPossible) {
+    note = `総額が設定範囲外です。${formatYen(minPossible)}〜${formatYen(maxPossible)}に収めると、勝者/敗者の支払い金額どおりに配分できます。`;
+    splitEvenly(items, totalBudget);
+    return { items, note };
+  }
+
+  const keepEndpoints = totalBudget >= endpointLow && totalBudget <= endpointHigh && maxRank > 1;
+  if (!keepEndpoints) note = "総額と勝者/敗者の支払い金額を同時に満たせないため、合計優先で近い金額に補正しています。";
+  normalizeAmounts(items, totalBudget, winnerPay, loserPay, keepEndpoints);
+  return { items, note };
+}
+
+function normalizeAmounts(items, totalBudget, winnerPay, loserPay, keepEndpoints) {
+  const adjustable = items.filter((item) => !keepEndpoints || (item.rank !== 1 && item.rank !== Math.max(...items.map((rankItem) => rankItem.rank))));
+  let diff = totalBudget - sumAmounts(items);
+  distributeAmountDiff(adjustable, diff, winnerPay, loserPay);
+  diff = totalBudget - sumAmounts(items);
+  if (diff !== 0) distributeAmountDiff(items, diff, winnerPay, loserPay);
+}
+
+function distributeAmountDiff(items, diff, winnerPay, loserPay) {
+  if (!items.length) return;
+  const order = diff > 0 ? [...items].sort((a, b) => b.rank - a.rank) : [...items].sort((a, b) => a.rank - b.rank);
+  let guard = 0;
+  while (diff !== 0 && guard < 50000) {
+    let changed = false;
+    for (const item of order) {
+      if (diff > 0 && item.amount < loserPay) {
+        item.amount += 1;
+        diff -= 1;
+        changed = true;
+      } else if (diff < 0 && item.amount > winnerPay) {
+        item.amount -= 1;
+        diff += 1;
+        changed = true;
+      }
+      if (diff === 0) break;
+    }
+    if (!changed) break;
+    guard += 1;
+  }
+}
+
+function splitEvenly(items, totalBudget) {
+  const base = Math.floor(totalBudget / items.length);
+  let rest = totalBudget - base * items.length;
+  items.sort((a, b) => b.rank - a.rank).forEach((item) => {
+    item.amount = base + (rest > 0 ? 1 : 0);
+    if (rest > 0) rest -= 1;
+  });
+}
+
+function sumAmounts(items) {
+  return items.reduce((sum, item) => sum + item.amount, 0);
 }
 
 function buildStandings(rankMode) {
@@ -418,7 +467,6 @@ function buildStrictStandings() {
   if (finalMatch?.winner) ranks.set(finalMatch.winner, 1);
   if (finalMatch?.loser) ranks.set(finalMatch.loser, 2);
   assignPlacementRanks(state.placementNodes, ranks);
-
   const wins = countMainWins();
   return [...state.members]
     .map((member) => ({ member, rank: ranks.get(member) || provisionalRank(member, wins) }))
@@ -427,6 +475,7 @@ function buildStrictStandings() {
 
 function assignPlacementRanks(nodes, ranks) {
   nodes.forEach((node) => {
+    splitPlacementNode(node);
     const realPlayers = node.players.filter((player) => player && player !== "BYE");
     if (realPlayers.length === 1) ranks.set(realPlayers[0], node.startRank);
     if (realPlayers.length === 2 && node.matches[0]?.winner && node.matches[0]?.loser) {
@@ -441,36 +490,6 @@ function provisionalRank(member, wins) {
   const orderedWins = [...new Set([...wins.values()].sort((a, b) => b - a))];
   const index = orderedWins.indexOf(wins.get(member));
   return index < 0 ? state.members.length : index + 1;
-}
-
-function normalizeTotal(items, totalBudget, minValue, maxValue) {
-  if (!items.length) return [];
-  const minPossible = minValue * items.length;
-  const maxPossible = maxValue * items.length;
-  const target = Math.min(Math.max(totalBudget, minPossible), maxPossible);
-  let diff = target - items.reduce((sum, item) => sum + item.amount, 0);
-  const ordered = [...items].sort((a, b) => b.rank - a.rank);
-
-  while (diff !== 0) {
-    let changed = false;
-    for (const item of ordered) {
-      if (diff > 0 && item.amount < maxValue) {
-        const add = Math.min(diff, maxValue - item.amount);
-        item.amount += add;
-        diff -= add;
-        changed = true;
-      } else if (diff < 0 && item.amount > minValue) {
-        const subtract = Math.min(Math.abs(diff), item.amount - minValue);
-        item.amount -= subtract;
-        diff += subtract;
-        changed = true;
-      }
-      if (diff === 0) break;
-    }
-    if (!changed) break;
-  }
-
-  return items;
 }
 
 function countMainWins() {
@@ -507,7 +526,13 @@ function isFinalMatch(roundIndex, matchIndex) {
 function updateAverage(memberCount) {
   const count = memberCount || memberInput.value.split(/\n|,/).map((name) => name.trim()).filter(Boolean).length;
   const totalBudget = Math.max(0, Number(foodBudget.value || 0));
-  averageShare.value = count ? `¥${Math.round(totalBudget / count).toLocaleString()}` : "¥0";
+  averageShare.value = count ? formatYen(Math.round(totalBudget / count)) : "¥0";
+}
+
+function renderPaymentNotice() {
+  if (!paymentStatus) return;
+  paymentStatus.textContent = state.paymentIssue;
+  paymentStatus.classList.toggle("is-visible", Boolean(state.paymentIssue));
 }
 
 function startRoulette() {
@@ -522,8 +547,8 @@ function startRoulette() {
 function spinRoulette() {
   setSelectedGame(games[Math.floor(Math.random() * games.length)]);
   if (state.rouletteStopping) {
-    state.rouletteDelay = Math.round(state.rouletteDelay * 1.22 + 18);
-    if (state.rouletteDelay > 520) {
+    state.rouletteDelay = Math.round(state.rouletteDelay * 1.2 + 22);
+    if (state.rouletteDelay > 560) {
       finishRoulette();
       return;
     }
@@ -587,6 +612,10 @@ function shuffle(items) {
 
 function nextPowerOfTwo(value) {
   return 2 ** Math.ceil(Math.log2(value));
+}
+
+function formatYen(value) {
+  return `¥${Math.round(value).toLocaleString()}`;
 }
 
 function escapeHtml(value) {
