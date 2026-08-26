@@ -298,3 +298,65 @@ textarea:focus, input:focus { border-color: var(--gold); }
   .share { white-space: normal; }
   .winner-strip, .result-row { grid-template-columns: 1fr; gap: 6px; }
 }
+
+/* Roulette stability: keep the card from jumping while images and names change rapidly. */
+.roulette-card {
+  contain: layout paint;
+  min-height: 392px;
+}
+
+.game-image {
+  min-height: 0;
+  isolation: isolate;
+}
+
+.game-image img {
+  display: block;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+.fallback-mark {
+  display: flex;
+  min-height: 86px;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 1.08;
+}
+
+.roulette-readout {
+  height: 104px;
+  overflow: hidden;
+}
+
+.roulette-readout strong {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  min-height: 4.65rem;
+  overflow: hidden;
+}
+
+.budget-grid {
+  grid-template-columns: 0.78fr 1.11fr 1.11fr;
+}
+
+.mini-field {
+  line-height: 1.25;
+}
+
+@media (max-width: 620px) {
+  .roulette-card {
+    min-height: 360px;
+  }
+
+  .roulette-readout {
+    height: 92px;
+  }
+
+  .roulette-readout strong {
+    min-height: 3.8rem;
+  }
+}

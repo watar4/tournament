@@ -232,7 +232,7 @@ function findPlacementNode(id, nodes) {
 }
 
 function renderAll() {
-  updateAverage(state.members.length);
+  updateAverage();
   ensurePlacementNodes();
   renderBracket();
   renderResults();
@@ -243,6 +243,7 @@ function renderBracket() {
   bracket.className = "bracket";
   bracket.innerHTML = "";
   if (!state.mainRounds.length) {
+    state.paymentIssue = "";
     bracket.className = "bracket empty-state";
     bracket.textContent = "メンバーを入力してトーナメントを作成してください。";
     return;
@@ -373,12 +374,9 @@ function allocatePayments(standings, totalBudget, winnerPay, loserPay) {
     const ratio = maxRank === 1 ? 0 : (item.rank - 1) / (maxRank - 1);
     return { ...item, amount: Math.round(winnerPay + (loserPay - winnerPay) * ratio) };
   });
-  const minPossible = winnerPay * standings.length;
-  const maxPossible = loserPay * standings.length;
-  const firstCount = standings.filter((item) => item.rank === 1).length;
-  const lastCount = standings.filter((item) => item.rank === maxRank).length;
-  const endpointLow = winnerPay * (standings.length - lastCount) + loserPay * lastCount;
-  const endpointHigh = winnerPay * firstCount + loserPay * (standings.length - firstCount);
+
+  const minPossible = winnerPay * items.length;
+  const maxPossible = loserPay * items.length;
   let note = "";
 
   if (totalBudget < minPossible || totalBudget > maxPossible) {
@@ -387,40 +385,42 @@ function allocatePayments(standings, totalBudget, winnerPay, loserPay) {
     return { items, note };
   }
 
-  const keepEndpoints = totalBudget >= endpointLow && totalBudget <= endpointHigh && maxRank > 1;
-  if (!keepEndpoints) note = "総額と勝者/敗者の支払い金額を同時に満たせないため、合計優先で近い金額に補正しています。";
-  normalizeAmounts(items, totalBudget, winnerPay, loserPay, keepEndpoints);
+  const topCount = items.filter((item) => item.rank === 1).length;
+  const bottomCount = items.filter((item) => item.rank === maxRank).length;
+  const fixedMinTotal = winnerPay * (items.length - bottomCount) + loserPay * bottomCount;
+  const fixedMaxTotal = winnerPay * topCount + loserPay * (items.length - topCount);
+  const canKeepWinnerAndLoser = maxRank > 1 && totalBudget >= fixedMinTotal && totalBudget <= fixedMaxTotal;
+  if (!canKeepWinnerAndLoser) note = "総額と勝者/敗者の支払い金額を同時に満たせないため、合計優先で近い金額に補正しています。";
+
+  normalizeIndividualAmounts(items, totalBudget, winnerPay, loserPay, canKeepWinnerAndLoser, maxRank);
   return { items, note };
 }
 
-function normalizeAmounts(items, totalBudget, winnerPay, loserPay, keepEndpoints) {
-  const adjustable = items.filter((item) => !keepEndpoints || (item.rank !== 1 && item.rank !== Math.max(...items.map((rankItem) => rankItem.rank))));
+function normalizeIndividualAmounts(items, totalBudget, winnerPay, loserPay, keepEndpoints, maxRank) {
+  const candidates = items.filter((item) => !keepEndpoints || (item.rank !== 1 && item.rank !== maxRank));
   let diff = totalBudget - sumAmounts(items);
-  distributeAmountDiff(adjustable, diff, winnerPay, loserPay);
+  distributeIndividualDiff(candidates, diff, winnerPay, loserPay);
   diff = totalBudget - sumAmounts(items);
-  if (diff !== 0) distributeAmountDiff(items, diff, winnerPay, loserPay);
+  if (diff !== 0) distributeIndividualDiff(items, diff, winnerPay, loserPay);
 }
 
-function distributeAmountDiff(items, diff, winnerPay, loserPay) {
+function distributeIndividualDiff(items, diff, winnerPay, loserPay) {
   if (!items.length) return;
   const order = diff > 0 ? [...items].sort((a, b) => b.rank - a.rank) : [...items].sort((a, b) => a.rank - b.rank);
+  let cursor = 0;
   let guard = 0;
-  while (diff !== 0 && guard < 50000) {
-    let changed = false;
-    for (const item of order) {
-      if (diff > 0 && item.amount < loserPay) {
-        item.amount += 1;
-        diff -= 1;
-        changed = true;
-      } else if (diff < 0 && item.amount > winnerPay) {
-        item.amount -= 1;
-        diff += 1;
-        changed = true;
-      }
-      if (diff === 0) break;
+  while (diff !== 0 && guard < 100000) {
+    const item = order[cursor % order.length];
+    if (diff > 0 && item.amount < loserPay) {
+      item.amount += 1;
+      diff -= 1;
+    } else if (diff < 0 && item.amount > winnerPay) {
+      item.amount -= 1;
+      diff += 1;
     }
-    if (!changed) break;
+    cursor += 1;
     guard += 1;
+    if (cursor % order.length === 0 && !order.some((candidate) => diff > 0 ? candidate.amount < loserPay : candidate.amount > winnerPay)) break;
   }
 }
 
@@ -523,10 +523,11 @@ function isFinalMatch(roundIndex, matchIndex) {
   return roundIndex === state.mainRounds.length - 1 && matchIndex === 0;
 }
 
-function updateAverage(memberCount) {
-  const count = memberCount || memberInput.value.split(/\n|,/).map((name) => name.trim()).filter(Boolean).length;
+function updateAverage() {
+  const draftCount = new Set(memberInput.value.split(/\n|,/).map((name) => name.trim()).filter(Boolean)).size;
+  const count = draftCount || state.members.length;
   const totalBudget = Math.max(0, Number(foodBudget.value || 0));
-  averageShare.value = count ? formatYen(Math.round(totalBudget / count)) : "¥0";
+  averageShare.value = count ? formatYen(Math.round(totalBudget / count)) : "参加者未入力";
 }
 
 function renderPaymentNotice() {
@@ -578,10 +579,20 @@ function setSelectedGame(game) {
   state.selectedGame = game;
   rouletteName.textContent = game.name;
   rouletteCategory.textContent = `${game.category} / No.${String(game.officialIndex).padStart(2, "0")}`;
-  rouletteImage.innerHTML = `<img src="${game.imageUrl}" alt="${escapeHtml(game.name)}"><a class="fallback-mark" href="${game.sourceUrl}" target="_blank" rel="noopener">${escapeHtml(game.name)}</a>`;
+
+  let image = rouletteImage.querySelector("img");
+  let label = rouletteImage.querySelector(".fallback-mark");
+  if (!image || !label) {
+    rouletteImage.innerHTML = '<img alt=""><a class="fallback-mark" target="_blank" rel="noopener"></a>';
+    image = rouletteImage.querySelector("img");
+    label = rouletteImage.querySelector(".fallback-mark");
+  }
+  if (image.getAttribute("src") !== game.imageUrl) image.src = game.imageUrl;
+  image.alt = game.name;
+  label.href = game.sourceUrl;
+  label.textContent = game.name;
   document.querySelectorAll(".game-chip").forEach((chip) => chip.classList.toggle("active", chip.dataset.name === game.name));
 }
-
 function renderGameList() {
   gameList.innerHTML = "";
   games.forEach((game) => {
