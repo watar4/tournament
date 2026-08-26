@@ -19,6 +19,15 @@
             <span>¥</span>
             <input id="foodBudget" type="number" min="0" step="1000" value="60000" />
           </div>
+          <div class="budget-grid">
+            <label>平均<input id="averageShare" type="text" readonly value="¥0" /></label>
+            <label>MAX<input id="maxShare" type="number" min="0" step="500" value="12000" /></label>
+            <label>MIN<input id="minShare" type="number" min="0" step="500" value="3000" /></label>
+          </div>
+          <div class="rank-mode" role="radiogroup" aria-label="順位モード">
+            <label><input type="radio" name="rankMode" value="ties" checked /> 同率あり</label>
+            <label><input type="radio" name="rankMode" value="strict" /> 同率なし</label>
+          </div>
         </div>
       </header>
 
@@ -57,7 +66,7 @@
           <div class="roulette-card">
             <div id="rouletteImage" class="game-image" role="img" aria-label="選択中のアソビ画像"></div>
             <div class="roulette-readout">
-              <p id="rouletteCategory">全52候補</p>
+              <p id="rouletteCategory">全51候補</p>
               <strong id="rouletteName">スタート待ち</strong>
             </div>
             <div class="roulette-controls">
@@ -80,3 +89,5 @@
     <script src="script.js"></script>
   </body>
 </html>
+
+

@@ -1,15 +1,15 @@
 :root {
   color-scheme: dark;
-  --bg: #111314;
-  --panel: #1b2022;
-  --panel-strong: #252b2e;
-  --line: #3a4448;
+  --bg: #0e1116;
+  --panel: #171d24;
+  --panel-strong: #222a33;
+  --line: #36424e;
   --text: #f7f4ed;
   --muted: #a9b4b6;
-  --accent: #f4c430;
+  --accent: #ffd34d;
   --accent-ink: #1c1600;
-  --red: #ee5a4f;
-  --green: #48c78e;
+  --red: #ff4f64;
+  --green: #42e09b;
   --blue: #4fa3ee;
   --shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
 }
@@ -24,9 +24,9 @@ body {
   color: var(--text);
   font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
   background:
-    linear-gradient(135deg, rgba(238, 90, 79, 0.16), transparent 32%),
-    linear-gradient(225deg, rgba(79, 163, 238, 0.16), transparent 35%),
-    var(--bg);
+    radial-gradient(circle at 8% 0%, rgba(255, 79, 100, 0.22), transparent 28%),
+    radial-gradient(circle at 88% 8%, rgba(79, 163, 238, 0.2), transparent 30%),
+    linear-gradient(180deg, #161a20 0%, var(--bg) 48%, #090b0f 100%);
 }
 
 button,
@@ -38,6 +38,14 @@ input {
 button {
   border: 0;
   cursor: pointer;
+}
+
+button {
+  transition: transform 160ms ease, filter 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+button:not(:disabled):active {
+  transform: translateY(1px) scale(0.99);
 }
 
 button:disabled {
@@ -95,6 +103,7 @@ h2 {
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
 }
 
 .pot-panel label {
@@ -122,6 +131,61 @@ h2 {
   outline: 0;
   font-size: inherit;
   font-weight: inherit;
+}
+.budget-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.budget-grid label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.budget-grid input {
+  width: 100%;
+  min-height: 36px;
+  margin-top: 5px;
+  padding: 0 8px;
+  color: var(--text);
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  outline: 0;
+  font-weight: 800;
+}
+
+.budget-grid input[readonly] {
+  color: var(--accent);
+}
+
+.rank-mode {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.rank-mode label {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--text);
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.rank-mode input {
+  accent-color: var(--accent);
 }
 
 .setup-band {
@@ -184,6 +248,13 @@ input:focus {
   background: var(--accent);
 }
 
+.primary-button:hover,
+.secondary-button:hover,
+.icon-button:hover,
+.danger-button:hover {
+  filter: brightness(1.08);
+}
+
 .secondary-button,
 .icon-button {
   color: var(--text);
@@ -221,7 +292,8 @@ input:focus {
   display: flex;
   gap: 16px;
   overflow-x: auto;
-  padding-bottom: 12px;
+  padding: 2px 2px 14px;
+  scroll-snap-type: x proximity;
 }
 
 .empty-state {
@@ -236,9 +308,10 @@ input:focus {
 
 .round {
   display: flex;
-  min-width: 240px;
+  min-width: 250px;
   flex-direction: column;
   gap: 14px;
+  scroll-snap-align: start;
 }
 
 .round-title {
@@ -249,9 +322,10 @@ input:focus {
 
 .match-card {
   padding: 12px;
-  background: var(--panel);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02)), var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
 }
 
 .match-title {
@@ -264,12 +338,12 @@ input:focus {
 .player-button {
   display: flex;
   width: 100%;
-  min-height: 42px;
+  min-height: 46px;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   margin-top: 8px;
-  padding: 9px 10px;
+  padding: 10px 11px;
   color: var(--text);
   background: var(--panel-strong);
   border: 1px solid transparent;
@@ -304,13 +378,15 @@ input:focus {
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
 }
 
 .game-image {
+  position: relative;
   display: grid;
   width: 100%;
   aspect-ratio: 16 / 9;
-  place-items: center;
+  place-items: stretch;
   overflow: hidden;
   background:
     linear-gradient(135deg, rgba(244, 196, 48, 0.82), rgba(79, 163, 238, 0.75)),
@@ -319,17 +395,23 @@ input:focus {
 }
 
 .game-image img {
+  grid-area: 1 / 1;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
 .fallback-mark {
-  padding: 18px;
-  color: #111314;
-  font-size: clamp(1.5rem, 7vw, 3.5rem);
+  grid-area: 1 / 1;
+  align-self: end;
+  justify-self: stretch;
+  padding: 12px;
+  color: var(--text);
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.78));
+  font-size: clamp(1.15rem, 5vw, 2.25rem);
   font-weight: 900;
   text-align: center;
+  text-decoration: none;
 }
 
 .roulette-readout {
@@ -388,6 +470,11 @@ input:focus {
 
   .app-header {
     display: grid;
+    align-items: stretch;
+  }
+
+  .pot-panel {
+    width: 100%;
   }
 
   .dashboard {
@@ -395,13 +482,55 @@ input:focus {
     flex-direction: column-reverse;
   }
 
+  .roulette-controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .primary-button,
+  .secondary-button,
+  .danger-button {
+    min-height: 52px;
+  }
+
   .round {
-    min-width: min(82vw, 280px);
+    min-width: min(82vw, 300px);
   }
 }
 
 @media (max-width: 520px) {
-  .game-list {
+  .app-shell {
+    padding: 14px;
+  }
+
+  h1 {
+    font-size: 2.2rem;
+  }
+
+  .setup-band,
+  .dashboard {
+    padding: 22px 0;
+  }
+
+  .budget-grid,
+  .rank-mode,
+  .roulette-controls {
     grid-template-columns: 1fr;
   }
+
+  .game-list {
+    grid-template-columns: 1fr;
+    max-height: 260px;
+  }
+
+  .roulette-readout strong {
+    font-size: 1.65rem;
+  }
+
+  .share {
+    white-space: normal;
+    text-align: right;
+  }
 }
+
+
