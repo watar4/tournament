@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>アソビ大全トーナメント</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">BBQ AFTER PARTY</p>
+          <h1>アソビ大全トーナメント</h1>
+        </div>
+        <div class="pot-panel">
+          <label for="foodBudget">食材費合計</label>
+          <div class="money-input">
+            <span>¥</span>
+            <input id="foodBudget" type="number" min="0" step="1000" value="60000" />
+          </div>
+        </div>
+      </header>
+
+      <section class="setup-band" aria-labelledby="setupTitle">
+        <div class="section-heading">
+          <p class="eyebrow">ENTRY</p>
+          <h2 id="setupTitle">参加メンバー</h2>
+        </div>
+        <div class="entry-grid">
+          <textarea id="memberInput" rows="8" spellcheck="false" placeholder="1行に1人ずつ入力&#10;例:&#10;たろう&#10;じろう&#10;さぶろう&#10;しろう"></textarea>
+          <div class="entry-actions">
+            <button id="sampleButton" class="secondary-button" type="button">サンプル投入</button>
+            <button id="createButton" class="primary-button" type="button">トーナメント作成</button>
+            <p id="entryHint" class="hint">2人以上で作成できます。人数が奇数の場合はランダムでシードを割り当てます。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="dashboard">
+        <section class="tournament-area" aria-labelledby="tournamentTitle">
+          <div class="section-heading row-heading">
+            <div>
+              <p class="eyebrow">BRACKET</p>
+              <h2 id="tournamentTitle">対戦表</h2>
+            </div>
+            <button id="resetWinnersButton" class="icon-button" type="button" title="勝敗をリセット" aria-label="勝敗をリセット">↺</button>
+          </div>
+          <div id="bracket" class="bracket empty-state">メンバーを入力してトーナメントを作成してください。</div>
+        </section>
+
+        <aside class="roulette-area" aria-labelledby="rouletteTitle">
+          <div class="section-heading">
+            <p class="eyebrow">ROULETTE</p>
+            <h2 id="rouletteTitle">ゲーム決定</h2>
+          </div>
+          <div class="roulette-card">
+            <div id="rouletteImage" class="game-image" role="img" aria-label="選択中のアソビ画像"></div>
+            <div class="roulette-readout">
+              <p id="rouletteCategory">全52候補</p>
+              <strong id="rouletteName">スタート待ち</strong>
+            </div>
+            <div class="roulette-controls">
+              <button id="startRouletteButton" class="primary-button" type="button">スタート</button>
+              <button id="stopRouletteButton" class="danger-button" type="button" disabled>ストップ</button>
+            </div>
+          </div>
+          <div id="gameList" class="game-list" aria-label="収録ゲーム一覧"></div>
+        </aside>
+      </section>
+    </main>
+
+    <template id="matchTemplate">
+      <article class="match-card">
+        <div class="match-title"></div>
+        <div class="players"></div>
+      </article>
+    </template>
+
+    <script src="script.js"></script>
+  </body>
+</html>
