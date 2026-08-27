@@ -136,6 +136,7 @@ function selectMainWinner(roundIndex, matchIndex, winner) {
   state.placementNodes = [];
   propagateMainWinners();
   renderAll();
+  if (isMainRoundComplete(roundIndex)) scrollToMainRound(roundIndex + 1);
   if (isFinalMatch(roundIndex, matchIndex)) document.querySelector("#results").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -251,9 +252,11 @@ function renderBracket() {
 
   const shares = calculateShares();
   state.mainRounds.forEach((round, roundIndex) => {
-    bracket.append(renderRound(roundName(roundIndex, state.mainRounds.length), round, (match, matchIndex, player) => {
+    const roundEl = renderRound(roundName(roundIndex, state.mainRounds.length), round, (match, matchIndex, player) => {
       selectMainWinner(roundIndex, matchIndex, player);
-    }, shares));
+    }, shares);
+    roundEl.dataset.mainRound = String(roundIndex);
+    bracket.append(roundEl);
   });
 
   if (getRankMode() === "strict") {
@@ -380,8 +383,7 @@ function allocatePayments(standings, totalBudget, winnerPay, loserPay) {
   let note = "";
 
   if (totalBudget < minPossible || totalBudget > maxPossible) {
-    note = `総額が設定範囲外です。${formatYen(minPossible)}〜${formatYen(maxPossible)}に収めると、勝者/敗者の支払い金額どおりに配分できます。`;
-    splitEvenly(items, totalBudget);
+    scalePaymentCurve(items, totalBudget);
     return { items, note };
   }
 
@@ -402,6 +404,28 @@ function normalizeIndividualAmounts(items, totalBudget, winnerPay, loserPay, kee
   distributeIndividualDiff(candidates, diff, winnerPay, loserPay);
   diff = totalBudget - sumAmounts(items);
   if (diff !== 0) distributeIndividualDiff(items, diff, winnerPay, loserPay);
+}
+
+function scalePaymentCurve(items, totalBudget) {
+  const currentTotal = sumAmounts(items);
+  if (currentTotal <= 0) {
+    splitEvenly(items, totalBudget);
+    return;
+  }
+
+  const scaled = items.map((item) => {
+    const rawAmount = item.amount * totalBudget / currentTotal;
+    return { item, amount: Math.floor(rawAmount), fraction: rawAmount % 1 };
+  });
+  let rest = totalBudget - scaled.reduce((sum, entry) => sum + entry.amount, 0);
+  scaled.sort((a, b) => b.fraction - a.fraction || b.item.rank - a.item.rank).forEach((entry) => {
+    if (rest <= 0) return;
+    entry.amount += 1;
+    rest -= 1;
+  });
+  scaled.forEach(({ item, amount }) => {
+    item.amount = amount;
+  });
 }
 
 function distributeIndividualDiff(items, diff, winnerPay, loserPay) {
@@ -521,6 +545,20 @@ function getRankMode() {
 
 function isFinalMatch(roundIndex, matchIndex) {
   return roundIndex === state.mainRounds.length - 1 && matchIndex === 0;
+}
+
+function isMainRoundComplete(roundIndex) {
+  const round = state.mainRounds[roundIndex];
+  return Boolean(round?.length) && round.every((match) => match.winner);
+}
+
+function scrollToMainRound(roundIndex) {
+  const target = bracket.querySelector(`[data-main-round="${roundIndex}"]`);
+  if (!target) return;
+  window.requestAnimationFrame(() => {
+    const left = target.offsetLeft - bracket.offsetLeft;
+    bracket.scrollTo({ left, behavior: "smooth" });
+  });
 }
 
 function updateAverage() {
