@@ -393,7 +393,10 @@ function allocatePayments(standings, totalBudget, winnerPay, loserPay) {
   const fixedMinTotal = winnerPay * (items.length - bottomCount) + loserPay * bottomCount;
   const fixedMaxTotal = winnerPay * topCount + loserPay * (items.length - topCount);
   const canKeepWinnerAndLoser = maxRank > 1 && totalBudget >= fixedMinTotal && totalBudget <= fixedMaxTotal;
-  if (!canKeepWinnerAndLoser) note = "総額と勝者/敗者の支払い金額を同時に満たせないため、合計優先で近い金額に補正しています。";
+  if (!canKeepWinnerAndLoser) {
+    scalePaymentCurve(items, totalBudget);
+    return { items, note };
+  }
 
   normalizeIndividualAmounts(items, totalBudget, winnerPay, loserPay, canKeepWinnerAndLoser, maxRank);
   return { items, note };
