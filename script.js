@@ -372,9 +372,10 @@ function allocatePayments(standings, totalBudget, winnerPay, loserPay) {
   if (!standings.length) return { items: [], note: "" };
   if (standings.length === 1) return { items: [{ ...standings[0], amount: totalBudget }], note: "" };
 
-  const maxRank = Math.max(...standings.map((item) => item.rank), 1);
+  const maxRank = Math.max(...standings.map((item) => paymentRank(item)), 1);
   const items = standings.map((item) => {
-    const ratio = maxRank === 1 ? 0 : (item.rank - 1) / (maxRank - 1);
+    const rank = paymentRank(item);
+    const ratio = maxRank === 1 ? 0 : (rank - 1) / (maxRank - 1);
     return { ...item, amount: Math.round(winnerPay + (loserPay - winnerPay) * ratio) };
   });
 
@@ -387,8 +388,8 @@ function allocatePayments(standings, totalBudget, winnerPay, loserPay) {
     return { items, note };
   }
 
-  const topCount = items.filter((item) => item.rank === 1).length;
-  const bottomCount = items.filter((item) => item.rank === maxRank).length;
+  const topCount = items.filter((item) => paymentRank(item) === 1).length;
+  const bottomCount = items.filter((item) => paymentRank(item) === maxRank).length;
   const fixedMinTotal = winnerPay * (items.length - bottomCount) + loserPay * bottomCount;
   const fixedMaxTotal = winnerPay * topCount + loserPay * (items.length - topCount);
   const canKeepWinnerAndLoser = maxRank > 1 && totalBudget >= fixedMinTotal && totalBudget <= fixedMaxTotal;
@@ -399,7 +400,7 @@ function allocatePayments(standings, totalBudget, winnerPay, loserPay) {
 }
 
 function normalizeIndividualAmounts(items, totalBudget, winnerPay, loserPay, keepEndpoints, maxRank) {
-  const candidates = items.filter((item) => !keepEndpoints || (item.rank !== 1 && item.rank !== maxRank));
+  const candidates = items.filter((item) => !keepEndpoints || (paymentRank(item) !== 1 && paymentRank(item) !== maxRank));
   let diff = totalBudget - sumAmounts(items);
   distributeIndividualDiff(candidates, diff, winnerPay, loserPay);
   diff = totalBudget - sumAmounts(items);
@@ -430,7 +431,7 @@ function scalePaymentCurve(items, totalBudget) {
 
 function distributeIndividualDiff(items, diff, winnerPay, loserPay) {
   if (!items.length) return;
-  const order = diff > 0 ? [...items].sort((a, b) => b.rank - a.rank) : [...items].sort((a, b) => a.rank - b.rank);
+  const order = diff > 0 ? [...items].sort((a, b) => paymentRank(b) - paymentRank(a)) : [...items].sort((a, b) => paymentRank(a) - paymentRank(b));
   let cursor = 0;
   let guard = 0;
   while (diff !== 0 && guard < 100000) {
@@ -470,10 +471,13 @@ function buildStandings(rankMode) {
 function buildTieStandings() {
   const champion = getChampion();
   const wins = countMainWins();
+  const eliminations = countEliminations();
   const grouped = [...state.members].sort((a, b) => {
     if (a === champion) return -1;
     if (b === champion) return 1;
-    return wins.get(b) - wins.get(a);
+    return wins.get(b) - wins.get(a)
+      || (eliminations.get(b) || 0) - (eliminations.get(a) || 0)
+      || a.localeCompare(b, "ja");
   });
   let previousWins = null;
   let rank = 0;
@@ -481,7 +485,7 @@ function buildTieStandings() {
     const currentWins = champion === member ? Number.POSITIVE_INFINITY : wins.get(member);
     if (currentWins !== previousWins) rank = index + 1;
     previousWins = currentWins;
-    return { member, rank };
+    return { member, rank, paymentRank: index + 1 };
   });
 }
 
@@ -494,7 +498,8 @@ function buildStrictStandings() {
   const wins = countMainWins();
   return [...state.members]
     .map((member) => ({ member, rank: ranks.get(member) || provisionalRank(member, wins) }))
-    .sort((a, b) => a.rank - b.rank || a.member.localeCompare(b.member, "ja"));
+    .sort((a, b) => a.rank - b.rank || a.member.localeCompare(b.member, "ja"))
+    .map((item, index) => ({ ...item, paymentRank: index + 1 }));
 }
 
 function assignPlacementRanks(nodes, ranks) {
@@ -525,6 +530,14 @@ function countMainWins() {
   return wins;
 }
 
+function countEliminations() {
+  const eliminations = new Map(state.members.map((member) => [member, 0]));
+  state.mainRounds.flat().forEach((match) => {
+    if (match.loser && eliminations.has(match.loser)) eliminations.set(match.loser, match.completedAt || 0);
+  });
+  return eliminations;
+}
+
 function allStrictRanksDecided() {
   if (getRankMode() !== "strict" || !getChampion()) return false;
   const ranks = new Map();
@@ -545,6 +558,10 @@ function getRankMode() {
 
 function isFinalMatch(roundIndex, matchIndex) {
   return roundIndex === state.mainRounds.length - 1 && matchIndex === 0;
+}
+
+function paymentRank(item) {
+  return item.paymentRank || item.rank;
 }
 
 function isMainRoundComplete(roundIndex) {
