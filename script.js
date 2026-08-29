@@ -128,6 +128,7 @@ function buildInitialRounds(members) {
 
 function selectMainWinner(roundIndex, matchIndex, winner) {
   const match = state.mainRounds[roundIndex][matchIndex];
+  if (match.winner === winner) return;
   const loser = match.players.find((player) => player && player !== "BYE" && player !== winner) || null;
   match.winner = winner;
   match.loser = loser;
@@ -173,8 +174,12 @@ function ensurePlacementNodes() {
   let startRank = 2;
   for (let roundIndex = state.mainRounds.length - 1; roundIndex >= 0; roundIndex -= 1) {
     const losers = state.mainRounds[roundIndex].map((match) => match.loser).filter(Boolean);
-    if (losers.length === 1) startRank += 1;
-    if (losers.length > 1) {
+    if (!losers.length) continue;
+    if (roundIndex === state.mainRounds.length - 1 && losers.length === 1) {
+      startRank += 1;
+      continue;
+    }
+    if (losers.length >= 1) {
       state.placementNodes.push(createPlacementNode(shuffle(losers), startRank));
       startRank += losers.length;
     }
@@ -204,6 +209,7 @@ function selectPlacementWinner(nodeId, matchIndex, winner) {
   const node = findPlacementNode(nodeId, state.placementNodes);
   if (!node) return;
   const match = node.matches[matchIndex];
+  if (match.winner === winner) return;
   match.winner = winner;
   match.loser = match.players.find((player) => player && player !== "BYE" && player !== winner) || null;
   match.completedAt = match.loser ? ++state.resultSequence : null;
@@ -217,6 +223,7 @@ function splitPlacementNode(node) {
   const realPlayers = node.players.filter((player) => player !== "BYE");
   if (realPlayers.length <= 2) return;
   if (!node.matches.every((match) => match.winner && (match.loser || match.players.includes("BYE")))) return;
+  if (node.children.length) return;
   const winners = node.matches.map((match) => match.winner).filter(Boolean);
   const losers = node.matches.map((match) => match.loser).filter(Boolean);
   node.children = [createPlacementNode(winners, node.startRank), createPlacementNode(losers, node.startRank + winners.length)]
@@ -324,7 +331,7 @@ function renderPlayerButton(player, shares, locked = false, match = null, matchI
     return button;
   }
   const share = shares.get(player) || { amount: 0, rankLabel: "-" };
-  button.innerHTML = `<span class="player-name">${escapeHtml(player)}</span><span class="share">${share.rankLabel} / ${formatYen(share.amount)}</span>`;
+  button.innerHTML = `<span class="player-name">${escapeHtml(player)}</span><span class="share">${share.rankLabel} / ${shareAmountLabel(share)}</span>`;
   if (locked) button.disabled = true;
   if (match?.winner === player) button.classList.add("winner");
   if (onPick && !locked) button.addEventListener("click", () => onPick(match, matchIndex, player));
@@ -347,13 +354,13 @@ function renderResults() {
     <div class="winner-strip">
       <span>WINNER</span>
       <strong>${escapeHtml(champion)}</strong>
-      <em>${formatYen(shares.get(champion)?.amount || 0)}</em>
+      <em>${shareAmountLabel(shares.get(champion))}</em>
     </div>
     ${strict && !complete ? '<p class="result-note">順位決定戦をすべて終えると、同率なしの支払いが確定します。</p>' : ''}
     <div class="result-table">
       ${standings.map((item) => {
         const share = shares.get(item.member) || { amount: 0, rankLabel: `${item.rank}位` };
-        return `<div class="result-row"><span>${share.rankLabel}</span><strong>${escapeHtml(item.member)}</strong><em>${formatYen(share.amount)}</em></div>`;
+        return `<div class="result-row"><span>${share.rankLabel}</span><strong>${escapeHtml(item.member)}</strong><em>${shareAmountLabel(share)}</em></div>`;
       }).join("")}
     </div>`;
 }
@@ -362,7 +369,12 @@ function calculateShares() {
   const totalBudget = Math.max(0, Number(foodBudget.value || 0));
   const winnerPay = Math.max(0, Number(minShare.value || 0));
   const loserPay = Math.max(winnerPay, Number(maxShare.value || winnerPay));
-  const standings = buildStandings(getRankMode());
+  const rankMode = getRankMode();
+  const standings = buildStandings(rankMode);
+  if (rankMode === "strict" && getChampion() && !allStrictRanksDecided()) {
+    state.paymentIssue = "";
+    return new Map(standings.map((item) => [item.member, { amount: null, rankLabel: `${item.rank}位`, pending: true }]));
+  }
   const allocated = allocatePayments(standings, totalBudget, winnerPay, loserPay);
   state.paymentIssue = allocated.note;
   return new Map(allocated.items.map((item) => [item.member, { amount: item.amount, rankLabel: `${item.rank}位` }]));
@@ -422,7 +434,7 @@ function scalePaymentCurve(items, totalBudget) {
     return { item, amount: Math.floor(rawAmount), fraction: rawAmount % 1 };
   });
   let rest = totalBudget - scaled.reduce((sum, entry) => sum + entry.amount, 0);
-  scaled.sort((a, b) => b.fraction - a.fraction || b.item.rank - a.item.rank).forEach((entry) => {
+  scaled.sort((a, b) => b.fraction - a.fraction || paymentRank(b.item) - paymentRank(a.item)).forEach((entry) => {
     if (rest <= 0) return;
     entry.amount += 1;
     rest -= 1;
@@ -455,7 +467,7 @@ function distributeIndividualDiff(items, diff, winnerPay, loserPay) {
 function splitEvenly(items, totalBudget) {
   const base = Math.floor(totalBudget / items.length);
   let rest = totalBudget - base * items.length;
-  items.sort((a, b) => b.rank - a.rank).forEach((item) => {
+  items.sort((a, b) => paymentRank(b) - paymentRank(a)).forEach((item) => {
     item.amount = base + (rest > 0 ? 1 : 0);
     if (rest > 0) rest -= 1;
   });
@@ -685,6 +697,11 @@ function nextPowerOfTwo(value) {
 
 function formatYen(value) {
   return `¥${Math.round(value).toLocaleString()}`;
+}
+
+function shareAmountLabel(share) {
+  if (!share) return formatYen(0);
+  return share.pending ? "確定待ち" : formatYen(share.amount);
 }
 
 function escapeHtml(value) {
